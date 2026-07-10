@@ -3,7 +3,15 @@
 <p align="center">
   <img src="banner.png" width="100%">
   </p>
-    
+
+<p align="center">
+
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![Platform](https://img.shields.io/badge/Platform-Windows-green)
+![License](https://img.shields.io/badge/License-MIT-orange)
+
+</p>    
+
 这个项目会从东方财富相关页面的数据接口获取三类日更数据：
 
 - 行情中心：https://quote.eastmoney.com/center/
