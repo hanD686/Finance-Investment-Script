@@ -1,0 +1,12 @@
+{
+  "page_size": 50,
+  "output_dir": "output",
+  "fund_start_date": "2024-01-01",
+  "fund_end_date": "",
+  "source_pages": {
+    "quote": "https://quote.eastmoney.com/center/",
+    "data": "https://data.eastmoney.com/center/",
+    "fund": "https://fund.eastmoney.com/?spm=100015.lw.4"
+  },
+  "market_fs": "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23"
+}
