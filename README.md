@@ -2,7 +2,7 @@
 
 <p align="center"
   <img src="banner.png"width="100%">
-  <p/>
+  </p>
     
 这个项目会从东方财富相关页面的数据接口获取三类日更数据：
 
