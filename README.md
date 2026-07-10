@@ -1,5 +1,4 @@
-# 东方财富每日行情脚本
-
+# ZM Finance Investment Script
 这个项目会从东方财富相关页面的数据接口获取三类日更数据：
 
 - 行情中心：https://quote.eastmoney.com/center/
