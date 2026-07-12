@@ -1,6 +1,9 @@
 name: Daily Eastmoney Pages
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
   schedule:
     # 18:30 Beijing time. GitHub cron uses UTC.
