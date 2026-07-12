@@ -34,7 +34,14 @@ jobs:
         run: python -m pip install -r requirements.txt
 
       - name: Generate latest data
-        run: python eastmoney_daily.py update
+        run: |
+          if python eastmoney_daily.py update; then
+            echo "Generated live Eastmoney data."
+          else
+            echo "Live data generation failed; publishing fallback page."
+            mkdir -p output
+            cp -R public/* output/
+          fi
 
       - name: Prepare Pages artifact
         run: touch output/.nojekyll
