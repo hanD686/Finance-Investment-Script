@@ -7,6 +7,8 @@ import shutil
 import socket
 import subprocess
 import sys
+import threading
+import time
 from datetime import date, datetime, timedelta
 from html import escape
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
@@ -26,6 +28,10 @@ DEFAULT_CONFIG = {
     "output_dir": "output",
     "fund_start_date": "2024-01-01",
     "fund_end_date": "",
+    "service_host": "0.0.0.0",
+    "service_port": 8000,
+    "daily_update_time": "18:00",
+    "update_on_service_start": True,
     "source_pages": {
         "quote": "https://quote.eastmoney.com/center/",
         "data": "https://data.eastmoney.com/center/",
@@ -110,14 +116,28 @@ class EastmoneyClient:
         )
 
     def get_json(self, url: str, params: dict[str, Any], referer: str) -> dict[str, Any]:
-        try:
-            response = self.session.get(url, params=params, headers={"Referer": referer}, timeout=30)
-            response.raise_for_status()
-            return response.json()
-        except requests.RequestException:
-            return json.loads(self.curl_get(url, params, referer))
+        last_error: Exception | None = None
+        for attempt in range(1, 4):
+            try:
+                return json.loads(self.get_text(url, params, referer))
+            except Exception as exc:
+                last_error = exc
+                if attempt < 3:
+                    time.sleep(attempt * 2)
+        raise RuntimeError(f"请求 JSON 数据失败：{url}") from last_error
 
     def get_text(self, url: str, params: dict[str, Any], referer: str) -> str:
+        last_error: Exception | None = None
+        for attempt in range(1, 4):
+            try:
+                return self.request_text(url, params, referer)
+            except Exception as exc:
+                last_error = exc
+                if attempt < 3:
+                    time.sleep(attempt * 2)
+        raise RuntimeError(f"请求文本数据失败：{url}") from last_error
+
+    def request_text(self, url: str, params: dict[str, Any], referer: str) -> str:
         try:
             response = self.session.get(url, params=params, headers={"Referer": referer}, timeout=30)
             response.raise_for_status()
@@ -429,6 +449,56 @@ def serve(output_dir: Path, host: str, port: int) -> None:
         print("\nStopped.")
 
 
+def service(config_path: Path, host: str, port: int, update_time: str, update_on_start: bool) -> None:
+    config = load_config(config_path)
+    output_dir = (ROOT / config["output_dir"]).resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if update_on_start:
+        run_update(config_path, "启动时更新")
+
+    scheduler = threading.Thread(
+        target=schedule_updates,
+        args=(config_path, update_time),
+        daemon=True,
+    )
+    scheduler.start()
+
+    print(f"每日自动更新时间：{update_time}")
+    serve(output_dir, host, port)
+
+
+def schedule_updates(config_path: Path, update_time: str) -> None:
+    while True:
+        next_run = next_run_at(update_time)
+        print(f"下一次自动更新：{next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+        while True:
+            seconds = (next_run - datetime.now()).total_seconds()
+            if seconds <= 0:
+                break
+            time.sleep(min(seconds, 60))
+        run_update(config_path, "每日定时更新")
+
+
+def next_run_at(update_time: str) -> datetime:
+    hour_text, minute_text = update_time.split(":", 1)
+    now = datetime.now()
+    next_run = now.replace(hour=int(hour_text), minute=int(minute_text), second=0, microsecond=0)
+    if next_run <= now:
+        next_run += timedelta(days=1)
+    return next_run
+
+
+def run_update(config_path: Path, label: str) -> None:
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {label}开始")
+    try:
+        update(config_path)
+    except Exception as exc:
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {label}失败：{exc}", file=sys.stderr)
+    else:
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {label}完成")
+
+
 def local_urls(port: int) -> list[str]:
     urls = [f"http://127.0.0.1:{port}/"]
     try:
@@ -464,6 +534,12 @@ def main(argv: list[str] | None = None) -> int:
     serve_parser.add_argument("--host", default="0.0.0.0")
     serve_parser.add_argument("--port", default=8000, type=int)
 
+    service_parser = subparsers.add_parser("service", help="常驻网页服务，并按每天固定时间自动更新")
+    service_parser.add_argument("--host", default=None)
+    service_parser.add_argument("--port", default=None, type=int)
+    service_parser.add_argument("--daily-update-time", default=None, help="每天更新时间，例如 18:00")
+    service_parser.add_argument("--no-update-on-start", action="store_true", help="启动服务时不立即更新")
+
     args = parser.parse_args(argv)
     command = args.command or "update"
     config_path = (ROOT / args.config).resolve()
@@ -474,6 +550,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if command == "serve":
         serve((ROOT / config["output_dir"]).resolve(), args.host, args.port)
+        return 0
+    if command == "service":
+        service(
+            config_path,
+            args.host or config["service_host"],
+            args.port or int(config["service_port"]),
+            args.daily_update_time or config["daily_update_time"],
+            bool(config["update_on_service_start"]) and not args.no_update_on_start,
+        )
         return 0
     parser.error(f"未知命令：{command}")
     return 2

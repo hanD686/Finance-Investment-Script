@@ -3,6 +3,10 @@
   "output_dir": "output",
   "fund_start_date": "2024-01-01",
   "fund_end_date": "",
+  "service_host": "0.0.0.0",
+  "service_port": 8000,
+  "daily_update_time": "18:00",
+  "update_on_service_start": true,
   "source_pages": {
     "quote": "https://quote.eastmoney.com/center/",
     "data": "https://data.eastmoney.com/center/",
